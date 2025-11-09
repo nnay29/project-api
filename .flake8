@@ -1,0 +1,6 @@
+# Contenu de .flake8
+[flake8]
+# E501: Ignorer l'erreur de longueur de ligne par défaut (79)
+# W503: Ignorer l'erreur de rupture de ligne avant l'opérateur (ancienne règle)
+ignore = E501, W503 
+max-line-length = 88
