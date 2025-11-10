@@ -35,25 +35,26 @@ jobs:
         echo "$DIFF" >> $GITHUB_ENV
         echo "EOF" >> $GITHUB_ENV
         
-    # 3. Appel au LLM (DeepSeek via OpenRouter)
-    - name: 🧠 3. Appel au LLM (DeepSeek via OpenRouter)
+    # 3. Appel au LLM (Gemini 2.5 Flash)
+    - name: 🧠 3. Appel au LLM (Gemini 2.5 Flash)
       id: call_llm
       env:
-        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         DIFF: ${{ env.DIFF_CONTENT }}
       run: |
         set -e
         # Prompt enrichi pour demander une source via un lien
         PROMPT="Tu es un relecteur de code expert. Analyse le diff pour des bugs ou des améliorations. Réponds en français. Dans ta réponse finale, inclue un lien vers une ressource externe (article, video youtube ou documentation) pertinente pour corriger le problème le plus important ou pour améliorer le code. La réponse doit être formatée en Markdown. Voici le DIFF:\n\n---\n$DIFF\n---\n"
         
-        # Appel API CURL à OpenRouter pour DeepSeek
-        API_RESPONSE=$(curl -s -w "%{http_code}" -X POST "https://openrouter.ai/api/v1/chat/completions" \
-          -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+        # Appel API CURL à Gemini
+        API_RESPONSE=$(curl -s -w "%{http_code}" -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$GEMINI_API_KEY" \
           -H "Content-Type: application/json" \
-          -H "HTTP-Referer: ${{ github.server_url }}/${{ github.repository }}" \
           -d "{
-              \"model\": \"deepseek/deepseek-r1-0528:free\",
-              \"messages\": [{\"role\": \"user\", \"content\": \"$PROMPT\"}]
+              \"contents\": [{
+                \"parts\": [{
+                  \"text\": \"$PROMPT\"
+                }]
+              }]
             }")
         
         HTTP_CODE=${API_RESPONSE: -3}
@@ -65,7 +66,7 @@ jobs:
           exit 1
         fi
         
-        LLM_RESPONSE=$(echo "$RESPONSE_BODY" | jq -r '.choices[0].message.content')
+        LLM_RESPONSE=$(echo "$RESPONSE_BODY" | jq -r '.candidates[0].content.parts[0].text')
         
         if [ "$LLM_RESPONSE" = "null" ] || [ -z "$LLM_RESPONSE" ]; then
           echo "Failed to extract LLM response"
@@ -85,7 +86,7 @@ jobs:
             const response = `${{ env.LLM_RESPONSE }}`;
             const actor = `${{ github.actor }}`;
             const prLink = `${{ github.event.pull_request.html_url }}`;
-            const body = `## 🤖 Revue Automatisée par l'IA (DeepSeek)\n\nSalut @${actor},\n\nVoici l'analyse de code pour ta PR :\n\n---\n${response}\n---\n\n_Veuillez noter que le commentaire complet et l'email ont été envoyés à l'équipe._`;
+            const body = `## 🤖 Revue Automatisée par l'IA (Gemini)\n\nSalut @${actor},\n\nVoici l'analyse de code pour ta PR :\n\n---\n${response}\n---\n\n_Veuillez noter que le commentaire complet et l'email ont été envoyés à l'équipe._`;
             
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -116,7 +117,7 @@ jobs:
           
           Une nouvelle Pull Request (#${{ github.event.pull_request.number}}) a été soumise par **@${{ github.event.pull_request.user.login }}**.
           
-          Voici la revue générée par l'IA (DeepSeek) :
+          Voici la revue générée par l'IA (Gemini) :
           
           ---
           
