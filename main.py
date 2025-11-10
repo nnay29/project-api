@@ -99,3 +99,25 @@ def delete_project(project_id: str) -> dict[str, str]:
     raise HTTPException(
         status_code=404, detail=f"Project with id {project_id} not found"
     )
+
+
+@app.get("/projects/course/{courseName}", response_model=List[Project])
+def get_projects_by_course(courseName: str) -> List[Project]:
+    """
+    Filtre et retourne tous les projets soumis pour un cours spécifique.
+    (Issue #6)
+
+    Args:
+        courseName: Le nom du cours à filtrer (ex: B3 Informatique).
+
+    Returns:
+        List[Project]: La liste des projets correspondants.
+    """
+    projects = load_projects()
+
+    # Filtrage des projets
+    filtered_projects = [proj for proj in projects if proj.course == courseName]
+
+    # Retourne une liste (FastAPI gère le statut 200 OK,
+
+    return filtered_projects
