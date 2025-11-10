@@ -64,6 +64,8 @@ jobs:
 
 
   # 3. JOB DE VÉRIFICATION DES TYPES (TYPE-CHECK)
+# Extrait du .github/workflows/ci.yml (Modifiez la section type-check)
+
   type-check:
     name: 🐍 3. Type Check (mypy)
     runs-on: ubuntu-latest
@@ -72,18 +74,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          # Vous pouvez essayer une version spécifique si '3.x' pose problème, par exemple '3.11'
+          python-version: '3.x' 
 
-      - name: Installation des Dépendances (incluant mypy)
+      - name: Installation des Dépendances (Projet + MyPy)
         run: |
-          # Installation des dépendances du projet
-          pip install -r requirements.txt
-          
-          # Installation de MyPy s'il n'est pas dans requirements.txt
-          pip install mypy
-          
-          # Installation des stubs pour les dépendances non typées si nécessaire (Pydantic et FastAPI en ont souvent besoin)
-          pip install types-pydantic types-requests types-certifi types-setuptools
+          pip install -r requirements.txt  # Ceci doit installer fastapi et pydantic
+          pip install mypy # On installe mypy séparément pour être sûr
+          # ON RETIRE ICI: pip install types-pydantic types-requests... qui était problématique
 
       - name: Exécuter MyPy
-        run: mypy main.py   
+        run: mypy main.py
