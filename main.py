@@ -88,3 +88,32 @@ def update_project_grade(project_id: str, grade_data: GradeUpdate):
             return project
 
     raise HTTPException(status_code=404, detail="Projet non trouvé")
+
+
+@app.delete("/projects/{project_id}")
+def delete_project(project_id: str):
+    """Supprime un projet par son id.
+
+    Args:
+        project_id: L'identifiant unique du projet à supprimer
+
+    Returns:
+        dict: Un message de confirmation avec l'id du projet supprimé
+
+    Raises:
+        HTTPException: 404 si le projet n'existe pas
+    """
+    projects = load_projects()
+
+    # Chercher l'index du projet à supprimer
+    for i, proj in enumerate(projects):
+        if proj.id == project_id:
+            # Supprimer et sauvegarder
+            del projects[i]
+            save_projects(projects)
+            return {"message": "Project deleted successfully", "id": project_id}
+
+    # Si on arrive ici, le projet n'a pas été trouvé
+    raise HTTPException(
+        status_code=404, detail=f"Project with id {project_id} not found"
+    )
