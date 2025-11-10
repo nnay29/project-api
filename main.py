@@ -40,7 +40,7 @@ def load_projects() -> List[Project]:
         return []
 
 
-def save_projects(projects: List[Project]):
+def save_projects(projects: List[Project]) -> None:
     """Sauvegarde la liste complète des projets dans db.json."""
     with open(DB_PATH, "w") as f:
 
@@ -51,7 +51,7 @@ app = FastAPI(title="ProjetAPI", version="1.0.0")
 
 
 @app.post("/projects", response_model=Project, status_code=201)
-def create_project(project_data: ProjectSubmission):
+def create_project(project_data: ProjectSubmission) -> Project:
     """
     Soumet un nouveau projet. Génère un ID unique et l'enregistre dans db.json.
     (Issue #1)
@@ -73,7 +73,7 @@ def create_project(project_data: ProjectSubmission):
 
 
 @app.delete("/projects/{project_id}")
-def delete_project(project_id: str):
+def delete_project(project_id: str) -> dict[str, str]:
     """Supprime un projet par son id.
 
     Args:
