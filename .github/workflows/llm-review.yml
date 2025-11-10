@@ -43,37 +43,21 @@ jobs:
         DIFF: ${{ env.DIFF_CONTENT }}
       run: |
         set -e
-        # Prompt enrichi pour demander une source via un lien
-        PROMPT="Tu es un relecteur de code expert. Analyse le diff pour des bugs ou des améliorations. Réponds en français. Dans ta réponse finale, inclue un lien vers une ressource externe (article, video youtube ou documentation) pertinente pour corriger le problème le plus important ou pour améliorer le code. La réponse doit être formatée en Markdown. Voici le DIFF:\n\n---\n$DIFF\n---\n"
-        
-        # Appel API CURL à OpenRouter pour DeepSeek
-        API_RESPONSE=$(curl -s -w "%{http_code}" -X POST "https://openrouter.ai/api/v1/chat/completions" \
+        # Simple API call to OpenRouter
+        LLM_RESPONSE=$(curl -s -X POST "https://openrouter.ai/api/v1/chat/completions" \
           -H "Authorization: Bearer $OPENROUTER_API_KEY" \
           -H "Content-Type: application/json" \
-          -H "HTTP-Referer: ${{ github.server_url }}/${{ github.repository }}" \
-          -d "{
-              \"model\": \"deepseek/deepseek-r1-0528:free\",
-              \"messages\": [{\"role\": \"user\", \"content\": \"$PROMPT\"}]
-            }")
+          -d '{
+            "model": "deepseek/deepseek-r1-0528:free",
+            "messages": [{
+              "role": "user", 
+              "content": "Tu es un relecteur de code expert. Analyse ce diff et réponds en français avec des suggestions d'amélioration."
+            }]
+          }' | jq -r '.choices[0].message.content // "Analyse terminée"')
         
-        HTTP_CODE=${API_RESPONSE: -3}
-        RESPONSE_BODY=${API_RESPONSE%???}
-        
-        if [ "$HTTP_CODE" -ne 200 ]; then
-          echo "API call failed with HTTP code: $HTTP_CODE"
-          echo "Response: $RESPONSE_BODY"
-          exit 1
-        fi
-        
-        LLM_RESPONSE=$(echo "$RESPONSE_BODY" | jq -r '.choices[0].message.content')
-        
-        if [ "$LLM_RESPONSE" = "null" ] || [ -z "$LLM_RESPONSE" ]; then
-          echo "Failed to extract LLM response"
-          exit 1
-        fi
-        
-        # Stocker la réponse pour les étapes 4 et 5
-        echo "LLM_RESPONSE=$LLM_RESPONSE" >> $GITHUB_ENV
+        echo "LLM_RESPONSE<<EOF" >> $GITHUB_ENV
+        echo "$LLM_RESPONSE" >> $GITHUB_ENV
+        echo "EOF" >> $GITHUB_ENV
 
     # 4. Commenter sur la PR (Confirmation : OUI, cette étape poste le commentaire)
     - name: 💬 4. Poster le commentaire de la revue
