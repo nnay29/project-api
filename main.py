@@ -1,6 +1,6 @@
 # main.py
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import json
 import uuid
@@ -40,7 +40,7 @@ def load_projects() -> List[Project]:
         return []
 
 
-def save_projects(projects: List[Project]):
+def save_projects(projects: List[Project]) -> None:
     """Sauvegarde la liste complète des projets dans db.json."""
     with open(DB_PATH, "w") as f:
 
@@ -51,7 +51,7 @@ app = FastAPI(title="ProjetAPI", version="1.0.0")
 
 
 @app.post("/projects", response_model=Project, status_code=201)
-def create_project(project_data: ProjectSubmission):
+def create_project(project_data: ProjectSubmission) -> Project:
     """
     Soumet un nouveau projet. Génère un ID unique et l'enregistre dans db.json.
     (Issue #1)
@@ -70,3 +70,32 @@ def create_project(project_data: ProjectSubmission):
     save_projects(projects)
 
     return new_project
+
+
+@app.delete("/projects/{project_id}")
+def delete_project(project_id: str) -> dict[str, str]:
+    """Supprime un projet par son id.
+
+    Args:
+        project_id: L'identifiant unique du projet à supprimer
+
+    Returns:
+        dict: Un message de confirmation avec l'id du projet supprimé
+
+    Raises:
+        HTTPException: 404 si le projet n'existe pas
+    """
+    projects = load_projects()
+
+    # Chercher l'index du projet à supprimer
+    for i, proj in enumerate(projects):
+        if proj.id == project_id:
+            # Supprimer et sauvegarder
+            del projects[i]
+            save_projects(projects)
+            return {"message": "Project deleted successfully", "id": project_id}
+
+    # Si on arrive ici, le projet n'a pas été trouvé
+    raise HTTPException(
+        status_code=404, detail=f"Project with id {project_id} not found"
+    )
