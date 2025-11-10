@@ -72,6 +72,24 @@ def create_project(project_data: ProjectSubmission) -> Project:
     return new_project
 
 
+# Endpoint PUT /projects/{project_id}/grade (Issue #4)
+class GradeUpdate(BaseModel):
+    grade: float
+
+
+@app.put("/projects/{project_id}/grade", response_model=Project)
+def update_project_grade(project_id: str, grade_data: GradeUpdate):
+    projects = load_projects()
+
+    for project in projects:
+        if project.id == project_id:
+            project.grade = grade_data.grade
+            save_projects(projects)
+            return project
+
+    raise HTTPException(status_code=404, detail="Projet non trouvé")
+
+
 @app.delete("/projects/{project_id}")
 def delete_project(project_id: str) -> dict[str, str]:
     """Supprime un projet par son id.
