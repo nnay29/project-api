@@ -99,3 +99,13 @@ def delete_project(project_id: str):
     raise HTTPException(
         status_code=404, detail=f"Project with id {project_id} not found"
     )
+
+
+@app.get("/projects", response_model=List[Project])
+def list_projects():
+    """
+    Retourne la liste complète de tous les projets stockés dans db.json.
+    (Issue #2)
+    """
+    # La fonction load_projects gère déjà la lecture et la désérialisation.
+    return load_projects()
