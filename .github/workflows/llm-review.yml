@@ -2,7 +2,6 @@
 
 name: Revue de Code par LLM & Notification
 
-# Se déclenche sur l'ouverture ou la mise à jour (synchronize) d'une PR vers develop
 on:
   pull_request:
     types: [opened, synchronize]
@@ -10,7 +9,7 @@ on:
       - develop
 
 permissions:
-  pull-requests: write # Permet au bot de commenter la PR
+  pull-requests: write
   contents: read
 
 jobs:
@@ -19,70 +18,45 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    
-    # 1. Checkout du code
-    - name: ⬇️ 1. Checkout du code
+    - name: Checkout du code
       uses: actions/checkout@v4
       
-    # 2. Obtenir le Diff (Changements) de la PR
-    - name: 📝 2. Obtenir le diff de la PR
+    - name: Obtenir le diff de la PR
       id: get_diff
       run: |
-        # Télécharger le diff de la PR
-        DIFF=$(curl -s ${{ github.event.pull_request.diff_url }})
-        # Stocker dans une variable d'environnement multiligne
-        echo "DIFF_CONTENT<<EOF" >> $GITHUB_ENV
-        echo "$DIFF" >> $GITHUB_ENV
-        echo "EOF" >> $GITHUB_ENV
+        curl -s ${{ github.event.pull_request.diff_url }} > diff.txt
         
-    # 3. Appel au LLM (DeepSeek via OpenRouter)
-    - name: 🧠 3. Appel au LLM (DeepSeek via OpenRouter)
+    - name: Appel au LLM
       id: call_llm
       env:
         OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        DIFF: ${{ env.DIFF_CONTENT }}
       run: |
-        set -e
-        # Simple API call to OpenRouter
-        LLM_RESPONSE=$(curl -s -X POST "https://openrouter.ai/api/v1/chat/completions" \
+        RESPONSE=$(curl -s -X POST "https://openrouter.ai/api/v1/chat/completions" \
           -H "Authorization: Bearer $OPENROUTER_API_KEY" \
           -H "Content-Type: application/json" \
-          -d '{
-            "model": "deepseek/deepseek-r1-0528:free",
-            "messages": [{
-              "role": "user", 
-              "content": "Tu es un relecteur de code expert. Analyse ce diff et réponds en français avec des suggestions d'amélioration."
-            }]
-          }' | jq -r '.choices[0].message.content // "Analyse terminée"')
+          -d '{"model":"deepseek/deepseek-r1-0528:free","messages":[{"role":"user","content":"Analyse ce code et donne des suggestions en francais"}]}' \
+          | jq -r '.choices[0].message.content // "Analyse terminee"')
         
-        echo "LLM_RESPONSE<<EOF" >> $GITHUB_ENV
-        echo "$LLM_RESPONSE" >> $GITHUB_ENV
+        echo "REVIEW_RESULT<<EOF" >> $GITHUB_ENV
+        echo "$RESPONSE" >> $GITHUB_ENV
         echo "EOF" >> $GITHUB_ENV
 
-    # 4. Commenter sur la PR (Confirmation : OUI, cette étape poste le commentaire)
-    - name: 💬 4. Poster le commentaire de la revue
+    - name: Poster le commentaire
       uses: actions/github-script@v7
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          try {
-            const response = `${{ env.LLM_RESPONSE }}`;
-            const actor = `${{ github.actor }}`;
-            const prLink = `${{ github.event.pull_request.html_url }}`;
-            const body = `## 🤖 Revue Automatisée par l'IA (DeepSeek)\n\nSalut @${actor},\n\nVoici l'analyse de code pour ta PR :\n\n---\n${response}\n---\n\n_Veuillez noter que le commentaire complet et l'email ont été envoyés à l'équipe._`;
-            
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: body
-            });
-          } catch (error) {
-            core.setFailed(`Failed to create comment: ${error.message}`);
-          }
+          const response = `${{ env.REVIEW_RESULT }}`;
+          const body = `## 🤖 Revue IA\n\n${response}`;
           
-    # 5. Envoyer l'Email de notification (Inclut le nom de l'auteur)
-    - name: 📧 5. Envoyer l'email de notification
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: body
+          });
+          
+    - name: Envoyer email
       uses: dawidd6/action-send-mail@v3
       with:
         server_address: smtp.gmail.com
@@ -90,27 +64,13 @@ jobs:
         secure: true
         username: ${{ secrets.MAIL_USERNAME }}
         password: ${{ secrets.MAIL_PASSWORD }}
-        
-        # Ajout du nom de l'auteur dans le sujet
-        subject: "🚨 Revue LLM pour PR #${{ github.event.pull_request.number}} par ${{ github.event.pull_request.user.login }}"
-        
-        # Ajout du nom de l'auteur et lien dans le corps
+        subject: "Revue PR #${{ github.event.pull_request.number}}"
         body: |
-          Bonjour l'équipe,
+          Nouvelle PR par ${{ github.event.pull_request.user.login }}
           
-          Une nouvelle Pull Request (#${{ github.event.pull_request.number}}) a été soumise par **@${{ github.event.pull_request.user.login }}**.
+          Revue IA:
+          ${{ env.REVIEW_RESULT }}
           
-          Voici la revue générée par l'IA (DeepSeek) :
-          
-          ---
-          
-          ${{ env.LLM_RESPONSE }}
-          
-          ---
-          
-          Lien vers la PR : ${{ github.event.pull_request.html_url }}
-          
+          Lien: ${{ github.event.pull_request.html_url }}
         to: ${{ secrets.TEAM_EMAIL_LIST }}
         from: ${{ secrets.MAIL_USERNAME }}
-    
-
