@@ -18,59 +18,77 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout du code
-      uses: actions/checkout@v4
-      
-    - name: Obtenir le diff de la PR
-      id: get_diff
-      run: |
-        curl -s ${{ github.event.pull_request.diff_url }} > diff.txt
+      - name: Checkout du code
+        uses: actions/checkout@v4
         
-    - name: Appel au LLM
-      id: call_llm
-      env:
-        OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      run: |
-        RESPONSE=$(curl -s -X POST "https://openrouter.ai/api/v1/chat/completions" \
-          -H "Authorization: Bearer $OPENROUTER_API_KEY" \
-          -H "Content-Type: application/json" \
-          -d '{"model":"deepseek/deepseek-r1-0528:free","messages":[{"role":"user","content":"Analyse ce code et donne des suggestions en francais"}]}' \
-          | jq -r '.choices[0].message.content // "Analyse terminee"')
-        
-        echo "REVIEW_RESULT<<EOF" >> $GITHUB_ENV
-        echo "$RESPONSE" >> $GITHUB_ENV
-        echo "EOF" >> $GITHUB_ENV
+      - name: Obtenir le diff de la PR
+        id: get_diff
+        run: |
+          curl -s ${{ github.event.pull_request.diff_url }} > diff.txt
+          
+      - name: Appel au LLM
+        id: call_llm
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          DIFF_CONTENT=$(cat diff.txt)
+          RESPONSE=$(curl -s -X POST "https://openrouter.ai/api/v1/chat/completions" \
+            -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"model\":\"deepseek/deepseek-r1-0528:free\",\"messages\":[{\"role\":\"user\",\"content\":\"Tu es un relecteur de code expert. Analyse ce diff. Si le code est bon, fournis des pistes d'amelioration. Si le code contient des bugs, liste-les. Reponds en francais et sois detaille. Inclus des ressources d'apprentissage (liens vers documentation, articles ou videos) pour aider le developpeur a s'ameliorer. Voici le diff: $DIFF_CONTENT\"}]}" \
+            | jq -r '.choices[0].message.content // "Analyse terminee"')
+          
+          echo "REVIEW_RESULT<<EOF" >> $GITHUB_ENV
+          echo "$RESPONSE" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
-    - name: Poster le commentaire
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const response = `${{ env.REVIEW_RESULT }}`;
-          const body = `## 🤖 Revue IA\n\n${response}`;
-          
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: body
-          });
-          
-    - name: Envoyer email
-      uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: smtp.gmail.com
-        server_port: 465
-        secure: true
-        username: ${{ secrets.MAIL_USERNAME }}
-        password: ${{ secrets.MAIL_PASSWORD }}
-        subject: "Revue PR #${{ github.event.pull_request.number}}"
-        body: |
-          Nouvelle PR par ${{ github.event.pull_request.user.login }}
-          
-          Revue IA:
-          ${{ env.REVIEW_RESULT }}
-          
-          Lien: ${{ github.event.pull_request.html_url }}
-        to: ${{ secrets.TEAM_EMAIL_LIST }}
-        from: ${{ secrets.MAIL_USERNAME }}
+      - name: Poster le commentaire
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const response = `${{ env.REVIEW_RESULT }}`;
+            const actor = `${{ github.actor }}`;
+            const prNumber = `${{ github.event.pull_request.number }}`;
+            const body = `## 🤖 Analyse Automatisée par Intelligence Artificielle (DeepSeek)
+
+            > **Salut @${actor} !** 👋
+            > 
+            > J'ai analysé ta Pull Request #${prNumber} et voici mon rapport détaillé :
+
+            ---
+
+            ${response}
+
+            ---
+
+            ### 📚 Note importante
+            *Cette analyse a été générée automatiquement par une IA. Elle vise à t'aider à améliorer ton code, mais n'hésite pas à poser des questions si quelque chose n'est pas clair !*
+
+            **Bonne continuation dans ton développement !** 🚀`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+            
+      - name: Envoyer email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "Revue PR #${{ github.event.pull_request.number}}"
+          body: |
+            Nouvelle PR par ${{ github.event.pull_request.user.login }}
+            
+            Revue IA:
+            ${{ env.REVIEW_RESULT }}
+            
+            Lien: ${{ github.event.pull_request.html_url }}
+          to: ${{ secrets.TEAM_EMAIL_LIST }}
+          from: ${{ secrets.MAIL_USERNAME }}
