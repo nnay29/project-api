@@ -101,11 +101,23 @@ def delete_project(project_id: str) -> dict[str, str]:
     )
 
 
-@app.get("/projects", response_model=List[Project])
-def list_projects():
+@app.get("/projects/course/{courseName}", response_model=List[Project])
+def get_projects_by_course(courseName: str) -> List[Project]:
     """
-    Retourne la liste complète de tous les projets stockés dans db.json.
-    (Issue #2)
+    Filtre et retourne tous les projets soumis pour un cours spécifique.
+    (Issue #6)
+
+    Args:
+        courseName: Le nom du cours à filtrer (ex: B3 Informatique).
+
+    Returns:
+        List[Project]: La liste des projets correspondants.
     """
-    # La fonction load_projects gère déjà la lecture et la désérialisation.
-    return load_projects()
+    projects = load_projects()
+
+    # Filtrage des projets
+    filtered_projects = [proj for proj in projects if proj.course == courseName]
+
+    # Retourne une liste (FastAPI gère le statut 200 OK,
+
+    return filtered_projects
